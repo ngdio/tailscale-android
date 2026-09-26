@@ -34,7 +34,6 @@ import (
 	"tailscale.com/tsd"
 	"tailscale.com/types/logger"
 	"tailscale.com/types/logid"
-	"tailscale.com/types/netmap"
 	"tailscale.com/util/eventbus"
 	"tailscale.com/wgengine"
 	"tailscale.com/wgengine/netstack"
@@ -59,6 +58,11 @@ type App struct {
 	backend         *ipnlocal.LocalBackend
 	ready           sync.WaitGroup
 	backendMu       sync.Mutex
+
+	// logger is the logtail logger whose uploads follow the user's
+	// IsClientLoggingEnabled preference. Populated once runBackend wires
+	// up the backend; nil before then.
+	logger atomic.Pointer[logtail.Logger]
 }
 
 func start(dataDir, directFileRoot string, hwAttestationPref bool, appCtx AppContext) Application {
@@ -142,6 +146,7 @@ func (a *App) runBackend(ctx context.Context, hardwareAttestation bool) error {
 		return err
 	}
 	a.logIDPublicAtomic.Store(&b.logIDPublic)
+	a.logger.Store(b.logger)
 	a.backend = b.backend
 	if hardwareAttestation {
 		a.backend.SetHardwareAttested()
@@ -171,19 +176,14 @@ func (a *App) runBackend(ctx context.Context, hardwareAttestation bool) error {
 	b.avoidEmptyDNS = a.isChromeOS()
 
 	var (
-		cfg        configPair
-		state      ipn.State
-		networkMap *netmap.NetworkMap
+		cfg   configPair
+		state ipn.State
 	)
 
 	stateCh := make(chan ipn.State)
-	netmapCh := make(chan *netmap.NetworkMap)
-	go b.backend.WatchNotifications(ctx, ipn.NotifyInitialNetMap|ipn.NotifyInitialPrefs|ipn.NotifyInitialState, func() {}, func(notify *ipn.Notify) bool {
+	go b.backend.WatchNotifications(ctx, ipn.NotifyInitialPrefs|ipn.NotifyInitialState|ipn.NotifyNoNetMap, func() {}, func(notify *ipn.Notify) bool {
 		if notify.State != nil {
 			stateCh <- *notify.State
-		}
-		if notify.NetMap != nil {
-			netmapCh <- notify.NetMap
 		}
 		return true
 	})
@@ -200,8 +200,6 @@ func (a *App) runBackend(ctx context.Context, hardwareAttestation bool) error {
 					a.closeVpnService(err, b)
 				}
 			}
-		case n := <-netmapCh:
-			networkMap = n
 		case c := <-configs:
 			cfg = c
 			if vpnService.service == nil || !b.isConfigNonNilAndDifferent(cfg.rcfg, cfg.dcfg) {
@@ -247,9 +245,6 @@ func (a *App) runBackend(ctx context.Context, hardwareAttestation bool) error {
 
 			vpnService.service = s
 
-			if networkMap != nil {
-				// TODO
-			}
 			if state >= ipn.Starting && b.isConfigNonNilAndDifferent(cfg.rcfg, cfg.dcfg) {
 				if err := b.updateTUN(cfg.rcfg, cfg.dcfg); err != nil {
 					a.closeVpnService(err, b)
@@ -298,7 +293,7 @@ func (a *App) newBackend(dataDir string, appCtx AppContext, store *stateStore,
 		}
 	}
 
-	logf := logger.RusagePrefixLog(log.Printf)
+	logf := logger.Logf(log.Printf)
 	b := &backend{
 		devices:  newTUNDevices(),
 		settings: settings,
@@ -329,7 +324,7 @@ func (a *App) newBackend(dataDir string, appCtx AppContext, store *stateStore,
 		log.Printf("netmon.New: %v", err)
 	}
 	b.netMon = netMon
-	b.setupLogs(dataDir, logID, logf, sys.HealthTracker.Get())
+	b.setupLogs(dataDir, logID, logf, sys.HealthTracker.Get(), a.isClientLoggingEnabled())
 	dialer := new(tsdial.Dialer)
 	vf := &VPNFacade{
 		SetBoth:           b.setCfg,
@@ -347,6 +342,7 @@ func (a *App) newBackend(dataDir string, appCtx AppContext, store *stateStore,
 		Metrics:        sys.UserMetricsRegistry(),
 		DriveForLocal:  driveimpl.NewFileSystemForLocal(logf),
 		EventBus:       sys.Bus.Get(),
+		ExtraRootCAs:   sys.ExtraRootCAs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("runBackend: NewUserspaceEngine: %v", err)

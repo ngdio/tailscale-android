@@ -10,6 +10,16 @@ This repository contains the open source Tailscale Android client.
 
 ## Using
 
+#### Tailscale Packages
+
+The latest stable release APK can be obtained from the [Tailscale Packages Stable Track](https://pkgs.tailscale.com/stable/#android).
+
+Unstable releases can be obtained from the [Tailscale Packages Unstable Track](https://pkgs.tailscale.com/unstable/#android).
+
+These APKs include all supported platforms and architectures.  For installing compact APKs, Android TV, or if you want automatic updates, visit the [Google Play Store](https://play.google.com/store/apps/details?id=com.tailscale.ipn).
+
+#### Google Playstore
+
 [<img src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
      alt="Get it on Google Play"
      height="80">](https://play.google.com/store/apps/details?id=com.tailscale.ipn)
@@ -82,6 +92,37 @@ alias nix='nix --extra-experimental-features "nix-command flakes"'
 nix develop
 ```
 
+The flake provides host tools such as Java, `make`, `curl`, and `git`, and
+points the build at a repo-local Android SDK in `./android-sdk`. The SDK
+directory is ignored by Git and is reused across builds.
+
+On first use, install the Android SDK components:
+
+```sh
+make androidsdk
+```
+
+Then build normally:
+
+```sh
+make tailscale-debug
+```
+
+The debug APK is written to `./tailscale-debug.apk`.
+
+For one-shot commands without entering an interactive shell:
+
+```sh
+nix develop --command make androidsdk
+nix develop --command make tailscale-debug
+```
+
+For faster Kotlin-only iteration while avoiding the `gomobile bind` step:
+
+```sh
+nix develop --command bash -lc 'cd android && ./gradlew ktfmtCheck compileDebugKotlin'
+```
+
 ## Building
 
 ```sh
@@ -91,8 +132,11 @@ make install
 
 ## Building a release
 
-Use `make tag_release` to bump the Android version code, update the version
-name, and tag the current commit.
+Use `make tag_release` to stamp the Play Store version code, update the version
+name, and tag the current commit. The version code is derived from wall-clock
+time (minutes since the Unix epoch) at release time and committed into
+`android/build.gradle`, so it increases monotonically across all builds and
+branches while staying fixed for any given commit.
 
 We only guarantee to support the latest Go release and any Go beta or
 release candidate builds (currently Go 1.14) in module mode. It might

@@ -4,6 +4,7 @@
 package com.tailscale.ipn.ui.model
 
 import android.net.Uri
+import com.tailscale.ipn.util.InlineShare
 import java.util.UUID
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -42,7 +43,11 @@ class Ipn {
       val OutgoingFiles: List<OutgoingFile>? = null,
       val State: Int? = null,
       var Prefs: Prefs? = null,
-      var NetMap: Netmap.NetworkMap? = null,
+      var SelfChange: Tailcfg.Node? = null,
+      var InitialStatus: IpnState.Status? = null,
+      var PeersChanged: List<Tailcfg.Node>? = null,
+      var PeersRemoved: List<NodeID>? = null,
+      var UserProfiles: Map<String, Tailcfg.UserProfile>? = null,
       var Engine: EngineStatus? = null,
       var BrowseToURL: String? = null,
       var BackendLogId: String? = null,
@@ -208,10 +213,12 @@ class Ipn {
       val Succeeded: Boolean = false,
   ) {
     @Transient lateinit var uri: Uri // only used on client
+    @Transient var inlineShare: InlineShare? = null
 
     fun prepare(peerId: StableNodeID): OutgoingFile {
       val f = copy(ID = UUID.randomUUID().toString(), PeerID = peerId)
       f.uri = uri
+      f.inlineShare = inlineShare
       return f
     }
   }

@@ -22,6 +22,11 @@ object MDMSettings {
   // MDM restriction keys
   const val KEY_HARDWARE_ATTESTATION = "HardwareAttestation"
 
+  // We default this to true, so that stricter behavior is used during initialization,
+  // prior to receiving MDM restrictions.
+  var isMDMConfigured = true
+    private set
+
   val forceEnabled = BooleanMDMSetting("ForceEnabled", "Force Enabled Connection Toggle")
 
   // Handled on the backed
@@ -53,11 +58,15 @@ object MDMSettings {
   // Unused on Android
   val detectThirdPartyAppConflicts =
       AlwaysNeverUserDecidesMDMSetting(
-          "DetectThirdPartyAppConflicts", "Detect potentially problematic third-party apps")
+          "DetectThirdPartyAppConflicts",
+          "Detect potentially problematic third-party apps",
+      )
 
   val exitNodeAllowLANAccess =
       AlwaysNeverUserDecidesMDMSetting(
-          "ExitNodeAllowLANAccess", "Allow LAN Access when using an exit node")
+          "ExitNodeAllowLANAccess",
+          "Allow LAN Access when using an exit node",
+      )
 
   // Handled on the backend
   val postureChecking =
@@ -66,7 +75,9 @@ object MDMSettings {
   // Handled on the backend
   val deviceSerialNumber =
       StringMDMSetting(
-          "DeviceSerialNumber", "Serial number of the device that is running Tailscale")
+          "DeviceSerialNumber",
+          "Serial number of the device that is running Tailscale",
+      )
 
   val useTailscaleDNSSettings =
       AlwaysNeverUserDecidesMDMSetting("UseTailscaleDNSSettings", "Use Tailscale DNS Settings")
@@ -130,6 +141,7 @@ object MDMSettings {
   fun loadFrom(preferences: Lazy<SharedPreferences>, restrictionsManager: RestrictionsManager?) {
     val bundle = restrictionsManager?.applicationRestrictions
     allSettings.forEach { it.setFrom(bundle, preferences) }
+    isMDMConfigured = bundle != null && !bundle.isEmpty
   }
 
   fun update(app: App, restrictionsManager: RestrictionsManager?) {
