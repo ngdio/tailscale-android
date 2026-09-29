@@ -39,8 +39,27 @@ jobs:
       - name: Build APKs
         run: make tailscale-debug.apk
 
+      - name: Build release APK
+        run: make tailscale-release.apk
+
       - name: Run tests
         run: make test
 
       - name: Run release lint
         run: make release-lint
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tailscale-debug-apk
+          path: tailscale-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tailscale-release-apk
+          path: tailscale-release.apk
+          if-no-files-found: error
+          retention-days: 14

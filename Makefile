@@ -37,6 +37,7 @@ endif
 ANDROID_BUILD_TOOLS_VERSION := $(shell grep '^androidBuildToolsVersion=' android/gradle.properties | cut -d'=' -f2)
 
 DEBUG_APK := tailscale-debug.apk
+RELEASE_APK := tailscale-release.apk
 RELEASE_AAB := tailscale-release.aab
 RELEASE_TV_AAB := tailscale-tv-release.aab
 
@@ -173,6 +174,11 @@ $(RELEASE_AAB): version gradle-dependencies
 	@echo "Building release AAB"
 	(cd android && ./gradlew test bundleRelease -PVERSION_CODE_BASE=$(VERSION_CODE_BASE))
 	install -C ./android/build/outputs/bundle/release/android-release.aab $@
+
+$(RELEASE_APK): version gradle-dependencies
+	@echo "Building release APK"
+	(cd android && ./gradlew test assembleRelease -PVERSION_CODE_BASE=$(VERSION_CODE_BASE))
+	install -C ./android/build/outputs/apk/release/android-release-unsigned.apk $@
 
 # PLATFORM=tv signals to Gradle that we should build for AndroidTV. Gradle
 # reserves the last digit of VERSION_CODE_BASE for the platform, so phone/tablet
