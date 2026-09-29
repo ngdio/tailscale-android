@@ -2,11 +2,9 @@ name: Android CI
 
 on:
   push:
-    branches:
-      - main
-      - "release-branch/*"
   pull_request:
     # all PRs on all branches
+  workflow_dispatch:
 
 jobs:
   build:
